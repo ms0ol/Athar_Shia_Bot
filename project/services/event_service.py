@@ -20,16 +20,33 @@ WEEKDAYS_AR = {
 WEEKDAYS_EN = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
 
+def _safe_load(path: str) -> list:
+    if not os.path.exists(path):
+        logger.warning("File not found: %s", path)
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            logger.error("Expected list in %s, got %s", path, type(data).__name__)
+            return []
+        return data
+    except json.JSONDecodeError as e:
+        logger.error("JSON parse error in %s: %s", path, e)
+        return []
+    except OSError as e:
+        logger.error("Cannot read %s: %s", path, e)
+        return []
+
+
 def _load_events() -> list:
     path = os.path.join(DATA_PATH, "event_content/events.json")
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    return _safe_load(path)
 
 
 def _load_weekly_duas() -> list:
     path = os.path.join(DATA_PATH, "event_content/weekly_duas.json")
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    return _safe_load(path)
 
 
 def _to_hijri(d: date) -> tuple[int, int]:

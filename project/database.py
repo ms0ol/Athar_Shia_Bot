@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 async def init_db() -> None:
     logger.info("Initializing database at %s", DB_PATH)
     async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA synchronous=NORMAL")
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id          INTEGER PRIMARY KEY,
@@ -57,3 +59,17 @@ async def set_state(key: str, value: str) -> None:
             (key, value),
         )
         await db.commit()
+
+
+async def try_claim_state(key: str) -> bool:
+    """Atomically claim a state key. Returns True only for the first caller.
+    Uses INSERT OR IGNORE so the check+set is a single atomic DB operation,
+    eliminating the TOCTOU race that exists with get_state/set_state pairs.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT OR IGNORE INTO bot_state(key, value) VALUES(?, ?)",
+            (key, "claimed"),
+        )
+        await db.commit()
+        return cur.rowcount == 1

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date
 import aiosqlite
@@ -154,10 +155,12 @@ async def cmd_broadcast(message: Message) -> None:
     sent, failed = 0, 0
     for uid in users:
         try:
-            await message.bot.send_message(uid, text, parse_mode="HTML")
+            for part in content_service.split_message(text):
+                await message.bot.send_message(uid, part, parse_mode="HTML")
             sent += 1
         except Exception:
             failed += 1
+        await asyncio.sleep(0.05)  # C-03: ~20 msg/s rate limit
 
     await message.answer(
         f"📢 <b>إرسال جماعي:</b>\n✅ نجح: {sent}\n❌ فشل: {failed}",

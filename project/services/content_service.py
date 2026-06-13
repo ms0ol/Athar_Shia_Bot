@@ -18,11 +18,25 @@ def _load(filename: str) -> list:
     if not os.path.exists(path):
         logger.warning("File not found: %s", path)
         return []
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
-    _cache[filename] = data
-    logger.info("Loaded %d items from %s", len(data), filename)
-    return data
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error("JSON parse error in %s: %s", path, e)
+        return []
+    except OSError as e:
+        logger.error("Cannot read %s: %s", path, e)
+        return []
+    if not isinstance(data, list):
+        logger.error("Expected list in %s, got %s", path, type(data).__name__)
+        return []
+    valid = [item for item in data if isinstance(item, dict) and "id" in item and "text" in item]
+    skipped = len(data) - len(valid)
+    if skipped:
+        logger.warning("Skipped %d invalid items (missing id/text) in %s", skipped, filename)
+    _cache[filename] = valid
+    logger.info("Loaded %d items from %s", len(valid), filename)
+    return valid
 
 
 def reload_all() -> None:

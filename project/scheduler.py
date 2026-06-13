@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date, datetime, timedelta
 
@@ -8,7 +9,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
 from config import CHANNEL_ID, DEFAULT_TIMEZONE, DB_PATH
-from database import get_state, set_state
+from database import get_state, set_state, try_claim_state
 from services import content_service, subscription_service, event_service
 from services.prayer_service import (
     PRAYER_NAMES_AR,
@@ -37,6 +38,7 @@ async def _send_to_subscribers(bot: Bot, content_type: str, text: str) -> None:
         except Exception as e:
             logger.debug("Failed to send to %d: %s", uid, e)
             failed += 1
+        await asyncio.sleep(0.05)  # C-03: ~20 msg/s rate limit
     logger.info("Sent '%s' → %d ok / %d failed", content_type, sent, failed)
 
 
@@ -63,6 +65,7 @@ async def _send_broadcast(bot: Bot, text: str) -> None:
                 await bot.send_message(uid, part, parse_mode="HTML")
         except Exception:
             pass
+        await asyncio.sleep(0.05)  # C-03: ~20 msg/s rate limit
 
 
 # ─── Phase 5: pinned prayer message ────────────────────────────────────────────
@@ -104,7 +107,8 @@ async def send_adhan(prayer: str) -> None:
         return
     today = datetime.now(pytz.timezone(DEFAULT_TIMEZONE)).strftime("%Y-%m-%d")
     state_key = f"adhan_{prayer}_{today}"
-    if await get_state(state_key):
+    # H-02: atomic INSERT OR IGNORE — only first caller proceeds
+    if not await try_claim_state(state_key):
         logger.debug("Adhan %s already sent today, skipping", prayer)
         return
 
@@ -117,7 +121,6 @@ async def send_adhan(prayer: str) -> None:
     else:
         await _send_broadcast(_bot, text)
 
-    await set_state(state_key, "sent")
     logger.info("Adhan sent: %s", prayer)
 
 
@@ -128,7 +131,8 @@ async def send_taqibat(prayer: str) -> None:
         return
     today = datetime.now(pytz.timezone(DEFAULT_TIMEZONE)).strftime("%Y-%m-%d")
     state_key = f"taqibat_{prayer}_{today}"
-    if await get_state(state_key):
+    # H-02: atomic INSERT OR IGNORE — only first caller proceeds
+    if not await try_claim_state(state_key):
         logger.debug("Taqibat %s already sent today", prayer)
         return
 
@@ -144,7 +148,6 @@ async def send_taqibat(prayer: str) -> None:
     else:
         await _send_to_subscribers(_bot, "taqibat", text)
 
-    await set_state(state_key, "sent")
     logger.info("Taqibat sent: %s", prayer)
 
 
@@ -195,17 +198,16 @@ async def check_daily_event() -> None:
         full_text = f"🗓 <b>{hijri}</b>\n\n{text}"
 
         if CHANNEL_ID:
-            await _send_to_channel(_bot, full_text)
+            # C-01: send once; pin the same message if pin_message=true (no double send)
             if event.get("pin_message"):
                 try:
-                    import aiosqlite
-                    async with aiosqlite.connect(DB_PATH) as db:
-                        cur = await db.execute("SELECT id FROM users LIMIT 1")
-                        await cur.fetchone()
                     msg = await _bot.send_message(CHANNEL_ID, full_text, parse_mode="HTML")
                     await _bot.pin_chat_message(CHANNEL_ID, msg.message_id, disable_notification=False)
                 except Exception as e:
-                    logger.error("Pin event error: %s", e)
+                    logger.error("Pin event error: %s — falling back to plain send", e)
+                    await _send_to_channel(_bot, full_text)
+            else:
+                await _send_to_channel(_bot, full_text)
         else:
             await _send_broadcast(_bot, full_text)
 
@@ -247,22 +249,22 @@ def _schedule_prayer_jobs_for_day(d: date | None = None) -> None:
             )
             logger.debug("Scheduled adhan: %s @ %s", prayer, prayer_dt.strftime("%H:%M"))
 
+        # M-06: schedule taqibat independently — don't skip if only taqibat time passed
         delay = TAQIBAT_DELAYS.get(prayer)
         if delay:
             taqibat_dt = prayer_dt + timedelta(minutes=delay)
-            if taqibat_dt <= now:
-                continue
-            tid = f"taqibat_{prayer}_{d.isoformat()}"
-            if not scheduler.get_job(tid):
-                scheduler.add_job(
-                    send_taqibat,
-                    trigger=DateTrigger(run_date=taqibat_dt, timezone=tz),
-                    args=[prayer],
-                    id=tid,
-                    replace_existing=True,
-                    misfire_grace_time=120,
-                )
-                logger.debug("Scheduled taqibat: %s @ %s", prayer, taqibat_dt.strftime("%H:%M"))
+            if taqibat_dt > now:
+                tid = f"taqibat_{prayer}_{d.isoformat()}"
+                if not scheduler.get_job(tid):
+                    scheduler.add_job(
+                        send_taqibat,
+                        trigger=DateTrigger(run_date=taqibat_dt, timezone=tz),
+                        args=[prayer],
+                        id=tid,
+                        replace_existing=True,
+                        misfire_grace_time=120,
+                    )
+                    logger.debug("Scheduled taqibat: %s @ %s", prayer, taqibat_dt.strftime("%H:%M"))
 
     logger.info("Prayer jobs scheduled for %s", d.isoformat())
 
