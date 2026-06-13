@@ -10,7 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 
 import config
 from database import init_db
-from scheduler import start_scheduler, stop_scheduler, update_pinned_prayer
+from scheduler import start_scheduler, stop_scheduler, update_pinned_prayer, check_daily_event
 import handlers
 import admin
 
@@ -38,12 +38,13 @@ def setup_logging() -> None:
     )
     logging.getLogger("aiogram").setLevel(logging.WARNING)
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    logging.getLogger("hpack").setLevel(logging.WARNING)
 
 
 async def main() -> None:
     setup_logging()
     logger = logging.getLogger(__name__)
-    logger.info("Starting Shia Religious Bot — Phase 5")
+    logger.info("Starting Shia Religious Bot — Phase 11 (complete)")
 
     if not config.BOT_TOKEN:
         logger.critical("BOT_TOKEN is not set.")
@@ -56,17 +57,18 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher()
-
     dp.include_router(handlers.router)
     dp.include_router(admin.router)
 
     start_scheduler(bot)
 
     if config.CHANNEL_ID:
-        logger.info("Channel configured: %s — syncing pinned message on startup", config.CHANNEL_ID)
+        logger.info("Syncing pinned prayer message on startup...")
         await update_pinned_prayer(bot)
 
-    logger.info("Bot is running. Press Ctrl+C to stop.")
+    await check_daily_event()
+
+    logger.info("Bot is running. Ctrl+C to stop.")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

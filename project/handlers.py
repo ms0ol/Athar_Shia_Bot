@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 import aiosqlite
 from aiogram import Router, F
 from aiogram.types import (
@@ -12,7 +13,7 @@ from aiogram.types import (
 from aiogram.filters import CommandStart, Command
 
 from config import DB_PATH
-from services import content_service, subscription_service, prayer_service
+from services import content_service, subscription_service, prayer_service, event_service
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -38,7 +39,8 @@ def main_menu_inline() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📖 زيارة",         callback_data="content:ziyarah"),
         ],
         [
-            InlineKeyboardButton(text="🔔 اشتراكاتي",     callback_data="subs:show"),
+            InlineKeyboardButton(text="🗓 المناسبات",     callback_data="content:event"),
+            InlineKeyboardButton(text="🔔 اشتراكاتي",    callback_data="subs:show"),
         ],
     ])
 
@@ -51,10 +53,10 @@ def subscriptions_inline(user_subs: list[str]) -> InlineKeyboardMarkup:
         return InlineKeyboardButton(text=f"{status} {label}", callback_data=f"subs:{action}:{key}")
 
     return InlineKeyboardMarkup(inline_keyboard=[
-        [btn("📿 حديث اليوم",       "hadith")],
-        [btn("💎 حكمة يومية",       "wisdom")],
-        [btn("🤲 دعاء يومي",        "daily_dua")],
-        [btn("📖 تعقيبات الصلاة",   "taqibat")],
+        [btn("📿 حديث اليوم",      "hadith")],
+        [btn("💎 حكمة يومية",      "wisdom")],
+        [btn("🤲 دعاء يومي",       "daily_dua")],
+        [btn("📖 تعقيبات الصلاة",  "taqibat")],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="menu:main")],
     ])
 
@@ -75,18 +77,21 @@ async def save_user(user) -> None:
 
 
 async def send_long(message: Message, text: str) -> None:
-    parts = content_service.split_message(text)
-    for part in parts:
+    for part in content_service.split_message(text):
         await message.answer(part, parse_mode="HTML")
 
+
+# ─── commands ──────────────────────────────────────────────────────────────────
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     await save_user(message.from_user)
-    logger.info("User %s started the bot", message.from_user.id)
+    logger.info("User %s started bot", message.from_user.id)
+    hijri = event_service.format_hijri_today()
     await message.answer(
         f"السلام عليكم ورحمة الله وبركاته 🌿\n\n"
-        f"أهلاً وسهلاً بك يا <b>{message.from_user.first_name}</b>\n\n"
+        f"أهلاً بك يا <b>{message.from_user.first_name}</b>\n"
+        f"<i>{hijri}</i>\n\n"
         f"اضغط على الزر أدناه للقائمة الرئيسية 👇",
         reply_markup=MAIN_KB,
         parse_mode="HTML",
@@ -101,7 +106,8 @@ async def cmd_help(message: Message) -> None:
         "/start  — بدء البوت\n"
         "/help   — المساعدة\n"
         "/menu   — القائمة الرئيسية\n"
-        "/prayer — مواقيت الصلاة",
+        "/prayer — مواقيت الصلاة\n"
+        "/event  — المناسبة اليوم",
         parse_mode="HTML",
     )
 
@@ -123,6 +129,26 @@ async def cmd_prayer(message: Message) -> None:
         text += f"\n\n⏳ <b>الصلاة القادمة:</b> {name_ar}\n🕐 بعد: {cd}"
     await message.answer(text, parse_mode="HTML")
 
+
+@router.message(Command("event"))
+async def cmd_event(message: Message) -> None:
+    today = date.today()
+    hijri = event_service.format_hijri_today(today)
+    event = event_service.get_current_event(today)
+    upcoming = event_service.get_upcoming_events(7, today)
+
+    parts = [f"🗓 <b>{hijri}</b>\n"]
+
+    if event:
+        parts.append(event_service.format_event(event, show_pin=True))
+    else:
+        parts.append("لا توجد مناسبة دينية اليوم.")
+
+    parts.append("\n" + event_service.format_upcoming(upcoming))
+    await message.answer("\n".join(parts), parse_mode="HTML")
+
+
+# ─── inline callbacks ───────────────────────────────────────────────────────────
 
 @router.callback_query(F.data == "menu:main")
 async def cb_main_menu(cb: CallbackQuery) -> None:
@@ -190,6 +216,22 @@ async def cb_prayer(cb: CallbackQuery) -> None:
         cd = prayer_service.countdown(next_p[1])
         text += f"\n\n⏳ <b>الصلاة القادمة:</b> {name_ar}\n🕐 بعد: {cd}"
     await cb.message.answer(text, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "content:event")
+async def cb_event(cb: CallbackQuery) -> None:
+    await cb.answer()
+    today = date.today()
+    hijri = event_service.format_hijri_today(today)
+    event = event_service.get_current_event(today)
+    upcoming = event_service.get_upcoming_events(7, today)
+    parts = [f"🗓 <b>{hijri}</b>\n"]
+    if event:
+        parts.append(event_service.format_event(event, show_pin=True))
+    else:
+        parts.append("لا توجد مناسبة دينية اليوم.")
+    parts.append("\n" + event_service.format_upcoming(upcoming))
+    await cb.message.answer("\n".join(parts), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "subs:show")

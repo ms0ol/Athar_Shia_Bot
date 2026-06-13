@@ -66,9 +66,11 @@ def _asr_angle(shadow_factor: float, dec: float, lat: float) -> float:
 
 def _decimal_to_time(hours: float, d: date) -> datetime:
     tz = pytz.timezone(DEFAULT_TIMEZONE)
-    h = int(hours) % 24
-    m = int((hours - int(hours)) * 60)
-    s = int(((hours - int(hours)) * 60 - m) * 60)
+    hours = hours % 24
+    total_seconds = round(hours * 3600)
+    h = (total_seconds // 3600) % 24
+    m = (total_seconds % 3600) // 60
+    s = total_seconds % 60
     naive = datetime(d.year, d.month, d.day, h, m, s)
     return tz.localize(naive)
 
