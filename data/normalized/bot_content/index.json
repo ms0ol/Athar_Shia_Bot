@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-06-12T22:41:18.451382",
+  "files": {
+    "hadith": "normalized/daily_content/hadith.json",
+    "wisdom": "normalized/daily_content/wisdom.json",
+    "daily_dua": "normalized/daily_content/daily_dua.json",
+    "munajat": "normalized/daily_content/munajat.json",
+    "weekly_duas": "normalized/event_content/weekly_duas.json",
+    "events": "normalized/event_content/events.json",
+    "fajr": "normalized/prayer_content/fajr.json",
+    "dhuhr": "normalized/prayer_content/dhuhr.json",
+    "maghrib": "normalized/prayer_content/maghrib.json",
+    "isha": "normalized/prayer_content/isha.json"
+  },
+  "counts": {
+    "hadith": 2564,
+    "wisdom": 21442,
+    "duas": 29,
+    "munajat": 15,
+    "weekly_duas": 7,
+    "taqibat": 123,
+    "events": 19
+  }
+}
