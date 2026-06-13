@@ -73,10 +73,14 @@ async def _pick(items: list, category: str) -> Optional[dict]:
     if not items:
         return None
 
-    unsent = []
-    for item in items:
-        if not await _is_sent(item["id"], category):
-            unsent.append(item)
+    # C-04: single query instead of N+1 — fetch all sent IDs at once
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT content_id FROM sent_content WHERE category=?", (category,)
+        )
+        sent_ids = {row[0] for row in await cur.fetchall()}
+
+    unsent = [item for item in items if item["id"] not in sent_ids]
 
     if not unsent:
         await _reset_sent(category)
