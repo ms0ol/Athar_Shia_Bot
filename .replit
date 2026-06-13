@@ -24,3 +24,7 @@ args = "cd project && python app.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[deployment]
+deploymentTarget = "vm"
+run = ["bash", "-c", "cd project && python app.py"]
