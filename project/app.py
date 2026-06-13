@@ -10,7 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 
 import config
 from database import init_db
-from scheduler import start_scheduler, stop_scheduler
+from scheduler import start_scheduler, stop_scheduler, update_pinned_prayer
 import handlers
 import admin
 
@@ -20,7 +20,7 @@ def setup_logging() -> None:
     fmt = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
 
-    handlers_list = [
+    log_handlers = [
         logging.StreamHandler(sys.stdout),
         RotatingFileHandler(
             os.path.join(config.LOGS_PATH, "bot.log"),
@@ -34,7 +34,7 @@ def setup_logging() -> None:
         level=getattr(logging, config.LOG_LEVEL, logging.INFO),
         format=fmt,
         datefmt=datefmt,
-        handlers=handlers_list,
+        handlers=log_handlers,
     )
     logging.getLogger("aiogram").setLevel(logging.WARNING)
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
@@ -43,10 +43,10 @@ def setup_logging() -> None:
 async def main() -> None:
     setup_logging()
     logger = logging.getLogger(__name__)
-    logger.info("Starting Shia Religious Bot — Phase 0")
+    logger.info("Starting Shia Religious Bot — Phase 5")
 
     if not config.BOT_TOKEN:
-        logger.critical("BOT_TOKEN is not set. Please add it to secrets.")
+        logger.critical("BOT_TOKEN is not set.")
         sys.exit(1)
 
     await init_db()
@@ -60,7 +60,11 @@ async def main() -> None:
     dp.include_router(handlers.router)
     dp.include_router(admin.router)
 
-    start_scheduler()
+    start_scheduler(bot)
+
+    if config.CHANNEL_ID:
+        logger.info("Channel configured: %s — syncing pinned message on startup", config.CHANNEL_ID)
+        await update_pinned_prayer(bot)
 
     logger.info("Bot is running. Press Ctrl+C to stop.")
     try:
