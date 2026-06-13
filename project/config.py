@@ -9,9 +9,14 @@ ADMIN_IDS: list[int] = [
 ]
 CHANNEL_ID: str = os.getenv("CHANNEL_ID", "")
 
-DB_PATH: str = os.path.join(os.path.dirname(__file__), "storage", "bot.db")
-DATA_PATH: str = os.path.join(os.path.dirname(__file__), "..", "data", "normalized")
-LOGS_PATH: str = os.path.join(os.path.dirname(__file__), "logs")
+# Absolute path of the directory containing this file (project/)
+_PROJECT_DIR: str = os.path.dirname(os.path.abspath(__file__))
+# Absolute path of the repository root (one level above project/)
+_REPO_ROOT: str = os.path.dirname(_PROJECT_DIR)
+
+DB_PATH: str   = os.path.join(_PROJECT_DIR, "storage", "bot.db")
+DATA_PATH: str = os.path.join(_REPO_ROOT,   "data", "normalized")
+LOGS_PATH: str = os.path.join(_PROJECT_DIR, "logs")
 
 DEFAULT_CITY: str = "الكوت"
 LATITUDE: float = 32.5017
