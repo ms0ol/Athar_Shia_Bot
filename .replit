@@ -1,4 +1,4 @@
-modules = ["python-3.11"]
+modules = ["python-3.12", "nix"]
 [agent]
 expertMode = true
 
@@ -28,3 +28,6 @@ outputType = "console"
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd project && python app.py"]
+
+[nix]
+channel = "stable-25_05"
