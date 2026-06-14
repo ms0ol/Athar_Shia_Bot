@@ -61,7 +61,7 @@ def _asr_angle(shadow_factor: float, dec: float, lat: float) -> float:
     lat_r = math.radians(lat)
     dec_r = math.radians(dec)
     angle = math.degrees(math.atan(1.0 / (shadow_factor + math.tan(abs(lat_r - dec_r)))))
-    return _hour_angle(-angle, dec, lat)
+    return _hour_angle(angle, dec, lat)
 
 
 def _decimal_to_time(hours: float, d: date) -> datetime:
