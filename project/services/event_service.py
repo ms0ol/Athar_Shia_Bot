@@ -115,11 +115,21 @@ def format_upcoming(events: list) -> str:
 
 
 def format_hijri_today(d: date | None = None) -> str:
+    from datetime import date, timedelta
+    import os
+    from hijri_converter import Gregorian
+
     if d is None:
         d = date.today()
-    h = Gregorian(d.year, d.month, d.day).to_hijri()
+
+    # 💡 نسحب الإزاحة مباشرة
+    offset = int(os.getenv("HIJRI_OFFSET", "-1"))
+    d_adjusted = d + timedelta(days=offset)
+    h = Gregorian(d_adjusted.year, d_adjusted.month, d_adjusted.day).to_hijri()
+
     weekday = WEEKDAYS_EN[d.weekday()]
     weekday_ar = WEEKDAYS_AR.get(weekday, "")
+
     hijri_months = [
         "", "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
         "جمادى الأولى", "جمادى الثانية", "رجب", "شعبان",
