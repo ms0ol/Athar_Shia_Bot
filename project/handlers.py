@@ -219,17 +219,27 @@ async def cb_prayer(cb: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "content:event")
-async def cb_event(cb: CallbackQuery) -> None:
+async def cb_content_event(cb: CallbackQuery) -> None:
     await cb.answer()
+
+    from datetime import date, timedelta
+    import os
+
     today = date.today()
-    hijri = event_service.format_hijri_today(today)
-    event = event_service.get_current_event(today)
-    upcoming = event_service.get_upcoming_events(7, today)
-    parts = [f"🗓 <b>{hijri}</b>\n"]
+    # 💡 نسحب الإزاحة مباشرة
+    offset = int(os.getenv("HIJRI_OFFSET", "-1"))
+    shia_today = today + timedelta(days=offset)
+
+    event = event_service.get_current_event(shia_today)
+    # بما أن days هو الوسيط الأول، يمكنك تمرير القيم بالترتيب
+    upcoming = event_service.get_upcoming_events(7, shia_today)
+
+    parts = []
     if event:
         parts.append(event_service.format_event(event, show_pin=True))
     else:
         parts.append("لا توجد مناسبة دينية اليوم.")
+
     parts.append("\n" + event_service.format_upcoming(upcoming))
     await cb.message.answer("\n".join(parts), parse_mode="HTML")
 

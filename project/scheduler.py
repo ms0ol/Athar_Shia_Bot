@@ -181,30 +181,40 @@ async def send_daily_munajat() -> None:
     await _daily_send("munajat", content_service.get_munajat, "taqibat")
 
 
+
 # ─── Phase 9: event check ──────────────────────────────────────────────────────
 
 async def check_daily_event() -> None:
     if _bot is None:
         return
+
+    from datetime import date, timedelta
+    import os
+    from config import CHANNEL_ID
+
     today = date.today()
     state_key = f"event_checked_{today.isoformat()}"
     if await get_state(state_key):
         return
 
-    event = event_service.get_current_event(today)
+    # 💡 نسحب الإزاحة مباشرة بدون المرور بملف الإعدادات لتجنب المشاكل
+    offset = int(os.getenv("HIJRI_OFFSET", "-1"))
+    shia_today = today + timedelta(days=offset)
+
+    event = event_service.get_current_event(shia_today)
+
     if event:
         text = event_service.format_event(event, show_pin=True)
         hijri = event_service.format_hijri_today(today)
         full_text = f"🗓 <b>{hijri}</b>\n\n{text}"
 
         if CHANNEL_ID:
-            # C-01: send once; pin the same message if pin_message=true (no double send)
             if event.get("pin_message"):
                 try:
                     msg = await _bot.send_message(CHANNEL_ID, full_text, parse_mode="HTML")
                     await _bot.pin_chat_message(CHANNEL_ID, msg.message_id, disable_notification=False)
                 except Exception as e:
-                    logger.error("Pin event error: %s — falling back to plain send", e)
+                    logger.error("Pin event error: %s", e)
                     await _send_to_channel(_bot, full_text)
             else:
                 await _send_to_channel(_bot, full_text)
