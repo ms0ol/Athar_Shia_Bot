@@ -5,7 +5,7 @@
     "title": "رأس السنة الهجرية",
     "description": "مستهل محرم الحرام - بداية السنة الهجرية",
     "priority": 8,
-    "pin_message": false,
+    "pin_message": true,
     "content_length": 57,
     "recommended_time": "event_day",
     "is_featured": false,

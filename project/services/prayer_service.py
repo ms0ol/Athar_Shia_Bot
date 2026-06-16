@@ -61,7 +61,8 @@ def _asr_angle(shadow_factor: float, dec: float, lat: float) -> float:
     lat_r = math.radians(lat)
     dec_r = math.radians(dec)
     angle = math.degrees(math.atan(1.0 / (shadow_factor + math.tan(abs(lat_r - dec_r)))))
-    return _hour_angle(-angle, dec, lat)
+    return _hour_angle(angle, dec, lat)
+
 
 
 def _decimal_to_time(hours: float, d: date) -> datetime:
@@ -131,14 +132,29 @@ def countdown(target: datetime) -> str:
 
 
 def format_prayer_times(times: dict[str, datetime]) -> str:
-    lines = [f"🕌 <b>مواقيت الصلاة — {DEFAULT_CITY}</b>\n"]
+    # إزاحات تصحيحية (بالدقائق) لتطابق التوقيت المحلي
+    offsets = {
+        "fajr": -15,      # أضف دقيقتين للفجر
+        "sunrise": -2,
+        "dhuhr": -5,     # أضف دقيقة للظهر
+        "asr": 1,
+        "maghrib": 2,   # أضف 3 دقائق للمغرب
+        "isha": 2       # أضف دقيقتين للعشاء
+    }
+
+    lines = [f"🕌 <b>مواقيت الصلاة — {DEFAULT_CITY}</b>\\n"]
     for key in ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"]:
         if key not in times:
             continue
+
+        # تطبيق الإزاحة
+        adjusted_time = times[key] + timedelta(minutes=offsets.get(key, 0))
+
         icon = PRAYER_ICONS.get(key, "🕐")
         name = PRAYER_NAMES_AR.get(key, key)
-        time_str = times[key].strftime("%I:%M %p")
+        time_str = adjusted_time.strftime("%I:%M %p")
         lines.append(f"{icon} <b>{name}</b>: {time_str}")
+
     return "\n".join(lines)
 
 
